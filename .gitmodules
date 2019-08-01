@@ -1,0 +1,3 @@
+[submodule "openapi_specs"]
+	path = openapi_specs
+	url = https://github.com/ylisovskyi/openapi_specs
