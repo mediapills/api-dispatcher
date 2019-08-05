@@ -34,18 +34,28 @@ class Validator:
         self.valid_schema = True
 
     def validate_spec(self, file=None):
-        """Validates given Swagger/OpenAPI specification file against corresponding schema """
+        """Validates given Swagger/OpenAPI specification file
+        against corresponding schema
+
+        """
 
         if file:
             self._spec = yaml.safe_load(open(file))
 
         schema_path = self._get_spec_schema_file()
         if not schema_path:
-            print("Unknown Swagger/OpenAPI specification version. Available schemas: 1.2, 2.0, 3.0.x")
+            print(
+                "Unknown Swagger/OpenAPI specification version. "
+                "Available schemas: 1.2, 2.0, 3.0.x"
+            )
             return -1
 
         schema = json.load(open(os.path.join(
-            os.path.dirname(os.path.realpath(__file__)), "..", "openapi_specs", schema_path[0], schema_path[1]
+            os.path.dirname(os.path.realpath(__file__)),
+            "..",
+            "openapi_specs",
+            schema_path[0],
+            schema_path[1]
         )))
 
         self.validate_refs(self._spec)
@@ -86,7 +96,9 @@ class Validator:
         for path in path_to_obj:
             item = item.get(path)
             if not item:
-                print("Invalid reference '{0}' in path: {1}".format(ref, path_to_ref))
+                print("Invalid reference '{0}' in path: {1}".format(
+                    ref, path_to_ref
+                ))
                 self.valid_refs = False
                 return
 
