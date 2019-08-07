@@ -23,27 +23,30 @@ import os
 import yaml
 from jsonschema.validators import validator_for
 
+SCHEMAS_FOLDER = (os.path.dirname(__file__), "..", "data", "schemas")
+
 
 class Validator:
     def __init__(self, spec_file):
         self._spec = Validator.load_file(spec_file)
         self.schema_path = None
 
-    def validate(self):
+    def validate(self, file=None):
         """Validates given Swagger/OpenAPI specification file """
-        if not self.schema_path:
+        if not self.schema_path or file:
+            self._spec = self.load_file(file) if file else self._spec
             self.schema_path = get_spec_validator(self._spec).schema_path
 
         valid_refs = self.validate_refs()
         valid_spec = self.validate_spec()
-        return -1 if valid_spec < 0 or valid_refs < 0 else 1
+        return False if not valid_spec or not valid_refs else True
 
     def validate_spec(self):
         """Validates specification against corresponding schema"""
         schema = json.load(open(os.path.join(*self.schema_path)))
         validator = validator_for(schema)
         errors = validator(schema).iter_errors(self._spec)
-        return -1 if len(list(errors)) > 0 else 1
+        return False if len(list(errors)) > 0 else True
 
     def get_all_refs(self, spec, _refs_list=None):
         """Gets all references from given Swagger/OpenAPI specification file """
@@ -61,9 +64,8 @@ class Validator:
         return _refs_list
 
     def validate_refs(self):
-        """Validates all references in specification file
-        """
-        valid = 1
+        """Validates all references in specification file """
+        valid = True
         refs_list = self.get_all_refs(spec=self._spec, _refs_list=[])
         for ref in refs_list:
             valid = self.check_ref(self._spec, ref)
@@ -78,9 +80,9 @@ class Validator:
         for path in path_to_obj:
             item = item.get(path)
             if not item:
-                return -1
+                return False
 
-        return 1
+        return True
 
     @staticmethod
     def load_file(file):
@@ -98,42 +100,21 @@ class Swagger1Validator(Validator):
 
     def __init__(self, spec_file):
         super(Swagger1Validator, self).__init__(spec_file)
-        self.schema_path = (
-            os.path.dirname(os.path.realpath(__file__)),
-            "..",
-            "data",
-            "schemas",
-            "v1.2",
-            "apiDeclaration.json"
-        )
+        self.schema_path = SCHEMAS_FOLDER + ("v1.2", "apiDeclaration.json")
 
 
 class Swagger2Validator(Validator):
 
     def __init__(self, spec_file):
         super(Swagger2Validator, self).__init__(spec_file)
-        self.schema_path = (
-            os.path.dirname(os.path.realpath(__file__)),
-            "..",
-            "data",
-            "schemas",
-            "v2.0",
-            "schema.json"
-        )
+        self.schema_path = SCHEMAS_FOLDER + ("v2.0", "schema.json")
 
 
 class OpenAPIValidator(Validator):
 
     def __init__(self, spec_file):
         super(OpenAPIValidator, self).__init__(spec_file)
-        self.schema_path = (
-            os.path.dirname(os.path.realpath(__file__)),
-            "..",
-            "data",
-            "schemas",
-            "v3.0",
-            "schema.json"
-        )
+        self.schema_path = SCHEMAS_FOLDER + ("v3.0", "schema.json")
 
 
 def get_spec_validator(file):
