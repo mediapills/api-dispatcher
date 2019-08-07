@@ -31,6 +31,9 @@ class Validator:
 
     def validate(self):
         """Validates given Swagger/OpenAPI specification file """
+        if not self.schema_path:
+            self.schema_path = get_spec_validator(self._spec).schema_path
+
         valid_refs = self.validate_refs()
         valid_spec = self.validate_spec()
         return -1 if valid_spec < 0 or valid_refs < 0 else 1
@@ -80,19 +83,11 @@ class Validator:
         return 1
 
     @staticmethod
-    def get_spec_validator(file):
-        """Returns validator object for given specification file """
-        spec = Validator.load_file(file)
-        for version_def in VALIDATORS_MAP:
-            if spec.get(version_def):
-                return VALIDATORS_MAP[version_def](spec)
-
-    @staticmethod
     def load_file(file):
         """Returns loaded specification file """
-        if isinstance(file, dict):
-            return file
         if file:
+            if isinstance(file, dict):
+                return file
             if os.path.splitext(file)[1] == '.json':
                 return json.load(open(file))
             elif os.path.splitext(file)[1] in ('.yml', '.yaml'):
@@ -143,7 +138,7 @@ class OpenAPIValidator(Validator):
 
 def get_spec_validator(file):
     """Returns validator object for given specification file """
-    spec = Validator.load_file(file)
+    spec = file if isinstance(file, dict) else Validator.load_file(file)
     for version_def in VALIDATORS_MAP:
         if spec.get(version_def):
             return VALIDATORS_MAP[version_def](spec)
