@@ -33,13 +33,24 @@ class Validator:
 
     def validate(self, file=None):
         """Validates given Swagger/OpenAPI specification file """
-        if not self.schema_path or file:
-            self._spec = self.load_file(file) if file else self._spec
-            self.schema_path = get_spec_validator(self._spec).schema_path
+        if not self.load_file_and_schema(file):
+            return False
 
         valid_refs = self.validate_refs()
         valid_spec = self.validate_spec()
         return False if not valid_spec or not valid_refs else True
+
+    def load_file_and_schema(self, file):
+        """Loads specification and sets schema for validated file """
+        if not self.schema_path or file:
+            self._spec = Validator.load_file(file) if file else self._spec
+            validator = get_spec_validator(self._spec)
+            if not validator:
+                return False
+
+            self.schema_path = validator.schema_path
+
+        return True
 
     def validate_spec(self):
         """Validates specification against corresponding schema"""
@@ -65,12 +76,12 @@ class Validator:
 
     def validate_refs(self):
         """Validates all references in specification file """
-        valid = True
         refs_list = self.get_all_refs(spec=self._spec, _refs_list=[])
         for ref in refs_list:
-            valid = self.check_ref(self._spec, ref)
+            if not self.check_ref(self._spec, ref):
+                return False
 
-        return valid
+        return True
 
     @staticmethod
     def check_ref(spec, ref):
