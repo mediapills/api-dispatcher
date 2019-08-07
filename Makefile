@@ -16,12 +16,17 @@ coverage:
 	codecov
 
 sync:
-	if [ -d "data" ]; then rm -rf data/; fi \
-	&& mkdir ./data \
-	&& cd data \
-	&& git init \
-	&& git config core.sparsecheckout true \
-	&& echo schemas/* >> .git/info/sparse-checkout \
-	&& echo examples/* >> .git/info/sparse-checkout \
-	&& git remote add -f origin https://github.com/OAI/OpenAPI-Specification \
-	&& git pull origin master
+	if [ ! -d "data" ]; \
+	then \
+		mkdir ./data \
+		&& cd data \
+		&& git init \
+		&& git config core.sparsecheckout true \
+		&& echo schemas/* >> .git/info/sparse-checkout \
+		&& echo examples/* >> .git/info/sparse-checkout \
+		&& git remote add -f origin https://github.com/OAI/OpenAPI-Specification \
+		&& git pull origin master; \
+	else \
+		cd data \
+		&& git pull origin master; \
+	fi
