@@ -19,12 +19,64 @@
 #
 # ******************************************************************************
 
-import unittest
-from api_dispatcher.validator import Validator
+import os
+import pytest
+from api_dispatcher.validator import get_spec_validator
 
 
-class TestTemplate(unittest.TestCase):
+def get_test_files(dir_name, include=None, exclude=None):
+    all_files = []
+    for entry in os.listdir(dir_name):
+        print(entry)
+        full_path = os.path.join(dir_name, entry)
+        if os.path.isdir(full_path):
+            if not exclude or (exclude and entry not in exclude):
+                _include = None if include and entry in include else include
+                all_files = all_files + get_test_files(
+                    full_path,
+                    include=_include,
+                    exclude=exclude
+                )
+        elif (
+                (not include or (include and entry in include)) and
+                (not exclude or (exclude and entry not in exclude))
+        ):
+            all_files.append(full_path)
 
-    def test_template(self):
-        Validator()
-        self.assertTrue(True)
+    return all_files
+
+
+PATH_TO_TEST_FILES = os.path.join(
+    os.path.dirname(os.path.realpath(__file__)),
+    "..",
+    "..",
+    "data",
+    "examples"
+)
+
+
+@pytest.mark.parametrize("file", get_test_files(
+    PATH_TO_TEST_FILES,
+    exclude=("petstore-separate", "invalid")
+))
+def test_validator_valid_specs(file):
+    validator = get_spec_validator(file)
+    assert validator.validate()
+
+
+@pytest.mark.parametrize("file", get_test_files(
+    PATH_TO_TEST_FILES,
+    include=("invalid",),
+    exclude=("petstore-without-required-spec-version.yaml",)
+))
+def test_validator_invalid_specs(file):
+    validator = get_spec_validator(file)
+    assert not validator.validate()
+
+
+@pytest.mark.parametrize("file", get_test_files(
+    PATH_TO_TEST_FILES,
+    include=("petstore-without-required-spec-version.yaml",)
+))
+def test_validator_invalid_spec_without_version(file):
+    assert not get_spec_validator(file)
