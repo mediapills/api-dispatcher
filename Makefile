@@ -18,15 +18,13 @@ coverage:
 sync:
 	if [ ! -d "data" ]; \
 	then \
-		mkdir ./data \
-		&& cd data \
-		&& git init \
-		&& git config core.sparsecheckout true \
-		&& echo schemas/* >> .git/info/sparse-checkout \
-		&& echo examples/* >> .git/info/sparse-checkout \
-		&& git remote add -f origin https://github.com/OAI/OpenAPI-Specification \
-		&& git pull origin master; \
-	else \
-		cd data \
-		&& git pull origin master; \
-	fi
+		mkdir ./data; \
+	fi; \
+	cd data \
+	&& git init \
+	&& git config core.sparsecheckout true \
+	&& echo schemas/* >> .git/info/sparse-checkout \
+	&& echo examples/* >> .git/info/sparse-checkout \
+	&& git remote add -f origin https://github.com/OAI/OpenAPI-Specification \
+	&& git pull origin master \
+	&& rm -rf .git
