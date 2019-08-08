@@ -45,7 +45,7 @@ class Validator:
         if not self.schema_path or file:
             self._spec = Validator.load_file(file) if file else self._spec
             validator = get_spec_validator(self._spec)
-            if not validator:
+            if validator.__class__ == Validator:
                 return False
 
             self.schema_path = validator.schema_path
@@ -134,6 +134,8 @@ def get_spec_validator(file):
     for version_def in VALIDATORS_MAP:
         if spec.get(version_def):
             return VALIDATORS_MAP[version_def](spec)
+
+    return Validator(spec)
 
 
 VALIDATORS_MAP = {
