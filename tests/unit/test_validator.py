@@ -55,12 +55,7 @@ valid_test_data = get_test_files(
 )
 invalid_test_data = get_test_files(
     PATH_TO_TEST_FILES,
-    include=("invalid",),
-    exclude=("petstore-without-required-spec-version.yaml",)
-)
-spec_without_version = get_test_files(
-    PATH_TO_TEST_FILES,
-    include=("petstore-without-required-spec-version.yaml",)
+    include=("invalid",)
 )
 
 
@@ -74,8 +69,3 @@ def test_validator_valid_specs(file):
 def test_validator_invalid_specs(file):
     validator = get_spec_validator(file)
     assert not validator.validate()
-
-
-@pytest.mark.parametrize("file", spec_without_version)
-def test_validator_invalid_spec_without_version(file):
-    assert not get_spec_validator(file)
