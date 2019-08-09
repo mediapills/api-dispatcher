@@ -20,6 +20,23 @@
 # ******************************************************************************
 
 from setuptools import setup, find_packages
+import os
+
+
+def get_data_files(dir_name):
+    all_files = []
+    for entry in os.listdir(dir_name):
+        full_path = os.path.join(dir_name, entry)
+        if os.path.isdir(full_path):
+            all_files = all_files + get_data_files(full_path)
+        else:
+            all_files.append(full_path)
+
+    return all_files
+
+
+examples = get_data_files(os.path.join('data', 'examples'))
+schemas = get_data_files(os.path.join('data', 'schemas'))
 
 setup(
     name='api-dispatcher',
@@ -29,4 +46,5 @@ setup(
     url='http://dlab.apache.org/',
     description='This a swagger provider.',
     packages=find_packages(),
+    data_files=[('', examples + schemas)]
 )
