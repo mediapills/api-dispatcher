@@ -27,9 +27,10 @@ SCHEMAS_FOLDER = (os.path.dirname(__file__), "..", "data", "schemas")
 
 
 class Validator:
+
     def __init__(self, spec_file):
         self._spec = Validator.load_file(spec_file)
-        self.schema_path = None
+        self.schema = None
 
     def validate(self, file=None):
         """Validates given Swagger/OpenAPI specification file """
@@ -42,21 +43,20 @@ class Validator:
 
     def load_file_and_schema(self, file):
         """Loads specification and sets schema for validated file """
-        if not self.schema_path or file:
+        if not self.schema or file:
             self._spec = Validator.load_file(file) if file else self._spec
             validator = get_spec_validator(self._spec)
             if validator.__class__ == Validator:
                 return False
 
-            self.schema_path = validator.schema_path
+            self.schema = validator.schema
 
         return True
 
     def validate_spec(self):
         """Validates specification against corresponding schema"""
-        schema = json.load(open(os.path.join(*self.schema_path)))
-        validator = validator_for(schema)
-        errors = validator(schema).iter_errors(self._spec)
+        validator = validator_for(self.schema)
+        errors = validator(self.schema).iter_errors(self._spec)
         return False if len(list(errors)) > 0 else True
 
     def get_all_refs(self, spec, _refs_list=None):
@@ -111,21 +111,27 @@ class Swagger1Validator(Validator):
 
     def __init__(self, spec_file):
         super(Swagger1Validator, self).__init__(spec_file)
-        self.schema_path = SCHEMAS_FOLDER + ("v1.2", "apiDeclaration.json")
+        self.schema = json.load(
+            open(os.path.join(*SCHEMAS_FOLDER, "v1.2", "apiDeclaration.json"))
+        )
 
 
 class Swagger2Validator(Validator):
 
     def __init__(self, spec_file):
         super(Swagger2Validator, self).__init__(spec_file)
-        self.schema_path = SCHEMAS_FOLDER + ("v2.0", "schema.json")
+        self.schema = json.load(
+            open(os.path.join(*SCHEMAS_FOLDER, "v2.0", "schema.json"))
+        )
 
 
 class OpenAPIValidator(Validator):
 
     def __init__(self, spec_file):
         super(OpenAPIValidator, self).__init__(spec_file)
-        self.schema_path = SCHEMAS_FOLDER + ("v3.0", "schema.json")
+        self.schema = json.load(
+            open(os.path.join(*SCHEMAS_FOLDER, "v3.0", "schema.json"))
+        )
 
 
 def get_spec_validator(file):
