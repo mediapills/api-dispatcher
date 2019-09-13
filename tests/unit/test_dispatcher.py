@@ -19,22 +19,23 @@
 #
 # ******************************************************************************
 import os
-from api_dispatcher.validator import create_validator
+
+from api_dispatcher.dispatcher import FlaskDispatcher
 from tests.unit.utils import create_tc, valid_test_data, invalid_test_data, \
     invalid_spec_version, PATH_TO_TEST_FILES
 
 
 valid_test_data = list(map(lambda x: [x, True], valid_test_data))
 invalid_test_data = list(map(lambda x: [x, False], invalid_test_data))
-invalid_spec_version = list(map(lambda x: [x, None], invalid_spec_version))
+invalid_spec_version = list(map(lambda x: [x, False], invalid_spec_version))
 
 
 def generate_tests_valid():
     tests = []
     for data in valid_test_data:
         def test(self, data=data):
-            validator = create_validator(data[0])
-            self.assertEqual(validator.validate(), data[1])
+            app = FlaskDispatcher()
+            self.assertEqual(app.add_api(data[0]), data[1])
         tests.append(test)
 
     return tests
@@ -42,50 +43,49 @@ def generate_tests_valid():
 
 def generate_tests_invalid():
     tests = []
-    for data in invalid_test_data:
+    test_data = invalid_test_data + invalid_spec_version
+    for data in test_data:
         def test(self, data=data):
-            validator = create_validator(data[0])
-            self.assertEqual(validator.validate(data[0]), data[1])
+            app = FlaskDispatcher()
+            self.assertEqual(app.add_api(data[0]), data[1])
         tests.append(test)
 
     return tests
 
 
-def generate_tests_invalid_version():
-    tests = []
-    for data in invalid_spec_version:
-        def test(self, data=data):
-            self.assertEqual(create_validator(data[0]), data[1])
-        tests.append(test)
-
-    return tests
+def listPets():
+    pass
 
 
-class ValidatorTestCase(create_tc(
+def showPetById():
+    pass
+
+
+class TestDispatcher(create_tc(
     {
-        'valid': generate_tests_valid(),
-        'invalid': generate_tests_invalid(),
-        'invalid_spec_version': generate_tests_invalid_version()
+        'valid_spec': generate_tests_valid(),
+        'invalid_spec': generate_tests_invalid()
     }
 )):
 
-    def test_validator_invalid_loaded_spec_version(self):
-        validator = create_validator(
-            os.path.join(PATH_TO_TEST_FILES, 'v3.0', 'petstore.yaml')
-        )
-        self.assertFalse(
-            validator.validate(
+    def test_validator_valid_specs_existing_handlers(self):
+        app = FlaskDispatcher()
+        self.assertTrue(
+            app.add_api(
                 os.path.join(
-                    PATH_TO_TEST_FILES,
-                    'invalid',
-                    'v3.0',
-                    'petstore-without-required-spec-version.yaml'
-                )
+                    PATH_TO_TEST_FILES, 'v2.0', 'json', 'petstore.json'
+                ),
+                methods_module=os.path.abspath(__file__)
             )
         )
 
-    def test_validator_invalid_value_to_load(self):
-        validator = create_validator(
-            os.path.join(PATH_TO_TEST_FILES, 'v3.0', 'petstore.yaml')
+    def test_validator_valid_specs_invalid_module(self):
+        app = FlaskDispatcher()
+        self.assertTrue(
+            app.add_api(
+                os.path.join(
+                    PATH_TO_TEST_FILES, 'v2.0', 'json', 'petstore.json'
+                ),
+                methods_module='foo'
+            )
         )
-        self.assertFalse(validator.validate(True))

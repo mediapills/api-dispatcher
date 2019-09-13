@@ -20,137 +20,154 @@
 # ******************************************************************************
 import json
 import os
-import yaml
+from api_dispatcher.utils import LOG, load_file
 from jsonschema.validators import validator_for
 
+SCHEMAS_FOLDER = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), 'data', 'schemas'
+)
 
-class Validator:
+
+class Validator(object):
+
     def __init__(self, spec_file):
-        self._spec = Validator.load_file(spec_file)
-        self.schema_path = None
+        """Loads Swagger specification
 
-    def validate(self):
-        """Validates given Swagger/OpenAPI specification file """
+        :type spec_file: Union[str, dict]
+        :param spec_file: Swagger specification file
+        """
+        self._spec = load_file(spec_file)
+        self.schema = None
+
+    def validate(self, filename=None):
+        """Validates given Swagger/OpenAPI specification file
+
+        :type filename: str
+        :param filename: file name of specification to validate
+
+        :rtype: bool
+        :return: whether specification and references are valid
+        """
+        if not self.load_file_and_schema(filename) or not self._spec:
+            return False
+
         valid_refs = self.validate_refs()
         valid_spec = self.validate_spec()
-        return -1 if valid_spec < 0 or valid_refs < 0 else 1
+        return valid_spec and valid_refs
+
+    def load_file_and_schema(self, filename):
+        """Loads specification and sets schema for validated file
+
+        :type filename: str
+        :param filename: file name to load
+
+        :rtype: bool
+        :return: whether specification is loaded
+        """
+        if isinstance(filename, str):
+            validator = create_validator(filename)
+            if not validator:
+                return False
+
+            self._spec = load_file(filename)
+            self.schema = validator.schema
+            return True
+
+        if not filename:
+            return True
+
+        return False
 
     def validate_spec(self):
-        """Validates specification against corresponding schema"""
-        schema = json.load(open(os.path.join(*self.schema_path)))
-        validator = validator_for(schema)
-        errors = validator(schema).iter_errors(self._spec)
-        return -1 if len(list(errors)) > 0 else 1
+        """Validates specification against corresponding schema
 
-    def get_all_refs(self, spec, _refs_list=None):
-        """Gets all references from given Swagger/OpenAPI specification file """
-        if isinstance(spec, dict):
-            for k, v in spec.items():
-                if k == "$ref":
-                    _refs_list.append(v)
-                else:
-                    self.get_all_refs(v, _refs_list)
+        :rtype: bool
+        :return: whether specification is valid against corresponding schema
+        """
+        validator = validator_for(self.schema)
+        errors = validator(self.schema).iter_errors(self._spec)
+        return not bool(list(errors))
 
-        elif isinstance(spec, list):
-            for item in spec:
-                self.get_all_refs(item, _refs_list)
+    def get_all_refs(self, spec):
+        """Gets all references from given Swagger/OpenAPI specification
 
-        return _refs_list
+        :type spec: Union[dict, list]
+        :param spec: Swagger/OpenAPI specification
+
+        :rtype: list
+        :return: list of all references from specification
+        """
+        for k, v in (
+            spec.items() if isinstance(spec, dict) else
+            enumerate(spec) if isinstance(spec, list) else []
+        ):
+            if k == '$ref':
+                LOG.info(v)
+                yield v
+            elif isinstance(v, (dict, list)):
+                for result in self.get_all_refs(v):
+                    yield result
 
     def validate_refs(self):
         """Validates all references in specification file
-        """
-        valid = 1
-        refs_list = self.get_all_refs(spec=self._spec, _refs_list=[])
-        for ref in refs_list:
-            valid = self.check_ref(self._spec, ref)
 
-        return valid
+        :rtype: bool
+        :return: True if all references are valid, else False
+        """
+        refs_list = self.get_all_refs(spec=self._spec)
+        for ref in refs_list:
+            if not self.check_ref(self._spec, ref):
+                return False
+
+        return True
 
     @staticmethod
     def check_ref(spec, ref):
-        """Validates given reference """
-        path_to_obj = ref.split("/")[1:]
+        """Validates given reference
+
+        :type spec: dict
+        :param spec: specification object to check reference against
+        :type ref: str
+        :param ref: reference string
+
+        :rtype: bool
+        :return: True if reference is valid, else False
+        """
+        path_to_obj = ref.split('/')[1:]
         item = spec
         for path in path_to_obj:
             item = item.get(path)
             if not item:
-                return -1
+                return False
 
-        return 1
-
-    @staticmethod
-    def get_spec_validator(file):
-        """Returns validator object for given specification file """
-        spec = Validator.load_file(file)
-        for version_def in VALIDATORS_MAP:
-            if spec.get(version_def):
-                return VALIDATORS_MAP[version_def](spec)
-
-    @staticmethod
-    def load_file(file):
-        """Returns loaded specification file """
-        if isinstance(file, dict):
-            return file
-        if file:
-            if os.path.splitext(file)[1] == '.json':
-                return json.load(open(file))
-            elif os.path.splitext(file)[1] in ('.yml', '.yaml'):
-                return yaml.safe_load(open(file))
+        return True
 
 
-class Swagger1Validator(Validator):
+def create_validator(spec):
+    """Returns validator object for given specification file
 
-    def __init__(self, spec_file):
-        super(Swagger1Validator, self).__init__(spec_file)
-        self.schema_path = (
-            os.path.dirname(os.path.realpath(__file__)),
-            "..",
-            "data",
-            "schemas",
-            "v1.2",
-            "apiDeclaration.json"
-        )
+    :type spec: Union[str, dict]
+    :param spec: file name or Swagger specification to validate
 
+    :raise InvalidSpecificationError: raised when given Swagger specification
+does not contain Swagger version used to describe API
 
-class Swagger2Validator(Validator):
+    :rtype: Validator
+    :return: Validator object with validation schema path defined
+    """
+    if not isinstance(spec, dict):
+        spec = load_file(spec)
 
-    def __init__(self, spec_file):
-        super(Swagger2Validator, self).__init__(spec_file)
-        self.schema_path = (
-            os.path.dirname(os.path.realpath(__file__)),
-            "..",
-            "data",
-            "schemas",
-            "v2.0",
-            "schema.json"
-        )
+    config_path = os.path.join(os.path.dirname(__file__), 'schemas_config.json')
+    with open(config_path) as config:
+        specs_info = json.load(config)
 
+    for version_def in specs_info.values():
+        if spec.get(version_def['schema_definition']):
+            validator = Validator(spec)
+            path = os.path.join(SCHEMAS_FOLDER, *version_def['schema_path'])
+            with open(path) as schema:
+                validator.schema = json.load(schema)
+            return validator
 
-class OpenAPIValidator(Validator):
-
-    def __init__(self, spec_file):
-        super(OpenAPIValidator, self).__init__(spec_file)
-        self.schema_path = (
-            os.path.dirname(os.path.realpath(__file__)),
-            "..",
-            "data",
-            "schemas",
-            "v3.0",
-            "schema.json"
-        )
-
-
-def get_spec_validator(file):
-    """Returns validator object for given specification file """
-    spec = Validator.load_file(file)
-    for version_def in VALIDATORS_MAP:
-        if spec.get(version_def):
-            return VALIDATORS_MAP[version_def](spec)
-
-
-VALIDATORS_MAP = {
-    "openapi": OpenAPIValidator,
-    "swagger": Swagger2Validator,
-    "swaggerVersion": Swagger1Validator
-}
+    LOG.error('Could not get validator for the given file')
