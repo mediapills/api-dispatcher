@@ -1,0 +1,7 @@
+{
+    "plan": "api-dispatcher-test-asp-flask",
+    "location": "westus2",
+    "sku": "F1",
+    "resource-group": "api-dispatcher-test-rg",
+    "subscription": "Free Trial"
+}
