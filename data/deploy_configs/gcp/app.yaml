@@ -1,0 +1,9 @@
+env: standard
+handlers:
+- script: test_deployer.app
+  url: /.*
+libraries:
+- name: ssl
+  version: latest
+runtime: python27
+threadsafe: true

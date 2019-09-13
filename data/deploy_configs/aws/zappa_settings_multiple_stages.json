@@ -1,0 +1,20 @@
+{
+    "dev": {
+        "app_function": "app.app",
+        "aws_region": "us-east-1",
+        "delete_local_zip": true,
+        "profile_name": "default",
+        "project_name": "DeployedFlaskAppDev",
+        "runtime": "python2.7",
+        "s3_bucket": "app-oc1tbmgnk"
+    },
+    "prod": {
+        "app_function": "app.app",
+        "aws_region": "us-east-1",
+        "delete_local_zip": true,
+        "profile_name": "default",
+        "project_name": "DeployedFlaskAppProd",
+        "runtime": "python2.7",
+        "s3_bucket": "app-oc1tbmgnk"
+    }
+}
