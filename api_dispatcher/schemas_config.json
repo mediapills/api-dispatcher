@@ -1,0 +1,14 @@
+{
+  "swagger1": {
+    "schema_definition": "swaggerVersion",
+    "schema_path": ["v1.2", "apiDeclaration.json"]
+  },
+  "swagger2": {
+    "schema_definition": "swagger",
+    "schema_path": ["v2.0", "schema.json"]
+  },
+  "openapi": {
+    "schema_definition": "openapi",
+    "schema_path": ["v3.0", "schema.json"]
+  }
+}
