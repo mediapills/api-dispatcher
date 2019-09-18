@@ -18,13 +18,74 @@
 # under the License.
 #
 # ******************************************************************************
+import os
+from api_dispatcher.validator import create_validator
+from tests.unit.utils import create_tc, valid_test_data, invalid_test_data, \
+    invalid_spec_version, PATH_TO_TEST_FILES
 
-import unittest
-from api_dispatcher.validator import Validator
+
+valid_test_data = list(map(lambda x: [x, True], valid_test_data))
+invalid_test_data = list(map(lambda x: [x, False], invalid_test_data))
+invalid_spec_version = list(map(lambda x: [x, None], invalid_spec_version))
 
 
-class TestTemplate(unittest.TestCase):
+def generate_tests_valid():
+    tests = []
+    for data in valid_test_data:
+        def test(self, data=data):
+            validator = create_validator(data[0])
+            self.assertEqual(validator.validate(), data[1])
+        tests.append(test)
 
-    def test_template(self):
-        Validator()
-        self.assertTrue(True)
+    return tests
+
+
+def generate_tests_invalid():
+    tests = []
+    for data in invalid_test_data:
+        def test(self, data=data):
+            validator = create_validator(data[0])
+            self.assertEqual(validator.validate(data[0]), data[1])
+        tests.append(test)
+
+    return tests
+
+
+def generate_tests_invalid_version():
+    tests = []
+    for data in invalid_spec_version:
+        def test(self, data=data):
+            self.assertEqual(create_validator(data[0]), data[1])
+        tests.append(test)
+
+    return tests
+
+
+class ValidatorTestCase(create_tc(
+    {
+        'valid': generate_tests_valid(),
+        'invalid': generate_tests_invalid(),
+        'invalid_spec_version': generate_tests_invalid_version()
+    }
+)):
+
+    def test_validator_invalid_loaded_spec_version(self):
+        validator = create_validator(
+            os.path.join(PATH_TO_TEST_FILES, 'v3.0', 'petstore.yaml')
+        )
+        self.assertFalse(
+            validator.validate(
+                os.path.join(
+                    PATH_TO_TEST_FILES,
+                    'invalid',
+                    'v3.0',
+                    'petstore-without-required-spec-version.yaml'
+                )
+            )
+        )
+
+    def test_validator_invalid_value_to_load(self):
+        validator = create_validator(
+            os.path.join(PATH_TO_TEST_FILES, 'v3.0', 'petstore.yaml')
+        )
+        self.assertFalse(validator.validate(True))
