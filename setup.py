@@ -24,7 +24,7 @@ from setuptools import setup, find_packages
 with open('requirements.txt') as f:
     required = f.read().splitlines()
 
-packages = find_packages()
+packages = find_packages() + ['data']
 
 
 setup(
