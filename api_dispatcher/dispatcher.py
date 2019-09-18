@@ -44,7 +44,7 @@ class FlaskDispatcher(Flask):
 
     @staticmethod
     def _get_param_type(param_spec):
-        """Finds parameter type in given specification
+        """Finds parameter type in given specification and shortens it if needed
 
         :type param_spec: dict
         :param param_spec: parameter specification object
@@ -53,9 +53,8 @@ class FlaskDispatcher(Flask):
         :return: argument type
         """
         param_spec = param_spec.get('schema', param_spec)
-        return PARAM_TYPES_MAP.get(
-            param_spec.get('type'), param_spec.get('type')
-        )
+        param_type = param_spec.get('type')
+        return PARAM_TYPES_MAP.get(param_type, param_type)
 
     @staticmethod
     def _build_typed_arg(arg, arg_type):

@@ -22,6 +22,7 @@ import boto3
 import json
 import os
 import random
+import re
 import sys
 import string
 import subprocess
@@ -66,13 +67,20 @@ class DeployerCreator(object):
 
 class BaseDeployer(object):
 
+    def _decode_cmd_output(self, cmd_output):
+        decoded = cmd_output.decode('utf8')
+        right_limit = decoded.rfind('\n') + 1
+        if not right_limit:
+            right_limit = len(decoded)
+        return decoded[:right_limit]
+
     @abstractmethod
     def deploy_flask(self, *args, **kwargs):
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def undeploy_flask(self, *args, **kwargs):
-        pass
+        raise NotImplementedError
 
 
 class AWSDeployer(BaseDeployer):
@@ -318,7 +326,10 @@ from current folder to AWS
 
 class GCPDeployer(BaseDeployer):
 
-    def create_config_file(self, script_loc, service):
+    def __init__(self):
+        self._deployed_versions = []
+
+    def create_config(self, script_loc, service):
         """Creates a deployment config for GCP
 
         :type script_loc: str
@@ -329,24 +340,39 @@ class GCPDeployer(BaseDeployer):
         :rtype: dict
         :return: deployment configuration for publishing Flask app to App Engine
         """
-        config = {}
+        config = {
+            'runtime': 'python37',
+            'handlers': 'auto'
+        }
         if sys.version_info[0] < 3:
-            runtime = 'python27'
-            handlers = script_loc
-            config.update({
+            config = {
+                'runtime': 'python27',
+                'handlers': [{'url': '/.*', 'script': script_loc}],
                 'threadsafe': True
-            })
-        else:
-            runtime = 'python37'
-            handlers = 'auto'
+            }
 
         config.update({
-            'runtime': runtime,
             'service': service,
-            'handlers': [{'url': '/.*', 'script': handlers}],
             'env': 'standard'
         })
         return config
+
+    def migrate_traffic(self, service_name):
+        versions_cmd = 'gcloud app versions list --service {} ' \
+                       '--format json'.format(service_name)
+        raw_versions_list = subprocess.check_output(versions_cmd)
+        json_version_list = self._decode_cmd_output(raw_versions_list)
+        traffic_split_cmd = 'gcloud app services set-traffic {0} ' \
+                            '--splits={1}=1 --quiet'
+        for version in json.loads(json_version_list):
+            if version['id'] not in self._deployed_versions:
+                traffic_split_cmd = traffic_split_cmd.format(
+                    service_name, version['id']
+                )
+                subprocess.check_output(traffic_split_cmd)
+                return True
+
+        return False
 
     def deploy_flask(self, deploy_settings=None, script_loc=None,
                      service='default'):
@@ -363,15 +389,19 @@ class GCPDeployer(BaseDeployer):
         :return: True if app is deployed, else False
         """
         if not deploy_settings:
-            config = self.create_config_file(script_loc, service)
+            config = self.create_config(script_loc, service)
             with open('app.yaml', 'w+') as fp:
                 yaml.dump(config, fp, default_flow_style=False)
 
-        deploy_cmd = 'gcloud app deploy --quiet {}'.format(
+        deploy_cmd = 'gcloud app deploy --quiet {} --format json'.format(
             deploy_settings if deploy_settings else ''
         )
-        out = subprocess.check_output(deploy_cmd)
-        return 'Deployed service' in out.decode('utf8')
+        raw_output = subprocess.check_output(deploy_cmd)
+        json_output = json.loads(self._decode_cmd_output(raw_output))
+        self._deployed_versions.extend(
+            [version['id'] for version in json_output['versions']]
+        )
+        return len(self._deployed_versions) > 0
 
     def undeploy_flask(self, service_name='default'):
         """Deletes deployed versions for specified API Engine service
@@ -382,19 +412,14 @@ class GCPDeployer(BaseDeployer):
         :rtype: bool
         :return: True if all versions were deleted
         """
-        versions_cmd = 'gcloud app versions list --service {} ' \
-                       '--format json'.format(service_name)
-        versions_json_list = subprocess.check_output(versions_cmd)
-        versions_to_delete = []
-        for version in json.loads(versions_json_list.decode('utf8')):
-            if int(version['traffic_split']) == 0:
-                versions_to_delete.append(version['id'])
+        if self._deployed_versions and self.migrate_traffic(service_name):
+            versions_delete_cmd = 'gcloud app versions delete --service {} ' \
+                                  '--quiet --format json '.format(service_name)
+            versions_delete_cmd += ' '.join(self._deployed_versions)
+            subprocess.check_output(versions_delete_cmd)
+            return True
 
-        versions_delete_cmd = 'gcloud app versions delete --service {} ' \
-                              '--quiet '.format(service_name)
-        versions_delete_cmd += ' '.join(versions_to_delete)
-        subprocess.check_output(versions_delete_cmd)
-        return True
+        return False
 
 
 class AzureDeployer(BaseDeployer):
@@ -418,7 +443,7 @@ from local Azure config
             with open(deploy_settings) as fp:
                 settings_json = json.load(fp)
 
-            params += '--logs --verbose --output json '
+            params += '--verbose --output json '
             arguments = [
                 'location', 'plan', 'sku', 'resource-group', 'subscription'
             ]
@@ -430,12 +455,16 @@ from local Azure config
                     params += '--{} {} '.format(arg, arg_value)
 
         else:
-            subs_json_list = subprocess.check_output('az account list')
-            for sub_info in json.loads(subs_json_list.decode('utf8')):
+            raw_subs_json_list = subprocess.check_output('az account list')
+            subs_json_list = self._decode_cmd_output(raw_subs_json_list)
+            for sub_info in json.loads(subs_json_list):
                 if int(sub_info['isDefault']):
                     self._subscription = sub_info['name']
-            result = subprocess.check_output('az webapp up -n test --dryrun')
-            self._resource_group = result['resourcegroup']
+            raw_result = subprocess.check_output(
+                'az webapp up -n test --dryrun'
+            )
+            result = self._decode_cmd_output(raw_result)
+            self._resource_group = json.loads(result)['resourcegroup']
 
         return params
 
@@ -451,11 +480,12 @@ from local Azure config
         :return: True if app is deployed, else False
         """
         params = self.define_parameters(deploy_settings)
-        result = subprocess.check_output(
+        raw_output = subprocess.check_output(
             'az webapp up -n {} {}'.format(name, params)
         )
-        LOG.info(result.decode('utf8'))
-        return True
+        output = self._decode_cmd_output(raw_output)
+        LOG.info(output)
+        return 'app_url' in json.loads(output)
 
     def undeploy_flask(self, deploy_settings=None):
         """Deletes resource group with deployed application
@@ -474,12 +504,15 @@ from local Azure config
         if not self._resource_group or not self._subscription:
             raise InvalidParameterError(
                 'You should specify resource group and subscription '
-                'in your settings file in order to remove you application stack'
+                'in your settings file to remove your application stack'
             )
 
-        result = subprocess.check_output(
+        raw_output = subprocess.check_output(
             'az group delete -n {} --yes --subscription {}'.format(
-                self._resource_group, self._subscription)
+                self._resource_group, self._subscription
+            ),
+            stderr=subprocess.STDOUT
         )
-        LOG.info(result.decode('utf8'))
-        return True
+        output = self._decode_cmd_output(raw_output)
+        LOG.info(output)
+        return not bool(re.search('[a-zA-Z]+', output))

@@ -2,6 +2,3 @@ flask
 pyyaml
 jsonschema
 zappa
-azure-cli
-awscli
-gcloud

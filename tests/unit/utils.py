@@ -77,20 +77,25 @@ test methods as a value
 
 def mock_subproc_command(command, *args, **kwargs):
     return_values = {
-        'az webapp up -n test --dryrun': {'resourcegroup': '1'},
+        'az webapp up -n test --dryrun': (
+            '{"resourcegroup": "1"}'.encode('utf8')
+        ),
+        'az webapp up': (
+            '{"app_url": "your-address"}'.encode('utf8')
+        ),
         'az account': (
-            '[{\"isDefault\": true, \"name\": \"Test\"}]'.encode('utf8')
+            '[{"isDefault": true, "name": "Test"}]'.encode('utf8')
         ),
         'gcloud app versions': (
-            '[{\"traffic_split\": 0, \"id\": \"1\"}]'.encode('utf8')
+            '[{"id": "1"}, {"id": "2"}]'.encode('utf8')
         ),
-        'gcloud app deploy': 'Deployed service'.encode('utf8')
+        'gcloud app deploy': '{"versions": [{"id": "1"}]}'.encode('utf8')
     }
     for ex_command, output in return_values.items():
         if command.startswith(ex_command):
             return output
 
-    return 'Test'.encode('utf8')
+    return ''.encode('utf8')
 
 
 class MockBoto3(object):
