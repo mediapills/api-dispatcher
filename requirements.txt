@@ -1,1 +1,4 @@
-six >= 1.12.0
+flask
+pyyaml
+jsonschema
+zappa

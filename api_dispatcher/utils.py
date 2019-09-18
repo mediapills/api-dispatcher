@@ -18,26 +18,33 @@
 # under the License.
 #
 # ******************************************************************************
-
-from setuptools import setup, find_packages
-
-with open('requirements.txt') as f:
-    required = f.read().splitlines()
-
-packages = find_packages() + ['data']
+import json
+import logging
+import os
+import yaml
 
 
-setup(
-    name='api-dispatcher',
-    version='0.0.1',
-    author='Apache Software Foundation',
-    author_email='dev@dlab.apache.org',
-    url='http://dlab.apache.org/',
-    description='This a swagger provider.',
-    packages=packages,
-    data_files=[
-        ('', ['requirements.txt', 'Makefile'])
-    ],
-    include_package_data=True,
-    install_requires=required
+logging.basicConfig(
+    format='[%(asctime)s] - %(levelname)s - %(funcName)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
 )
+LOG = logging.getLogger('api-dispatcher')
+
+
+def load_file(filename):
+    """Returns loaded specification file
+
+    :type filename: Union[str, dict]
+    :param filename: file name to load
+
+    :rtype: dict
+    :return: loaded Swagger specification object
+    """
+    if isinstance(filename, dict):
+        return filename
+    with open(filename) as fp:
+        ext = os.path.splitext(filename)[1]
+        if ext == '.json':
+            return json.load(fp)
+        if ext in ('.yml', '.yaml'):
+            return yaml.safe_load(fp)

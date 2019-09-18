@@ -2,8 +2,8 @@
 omit =
     */__init__.py
     .tox
-    dlab_core/__version__.py
     setup.py
+    */utils.py
 
 [report]
 exclude_lines =
