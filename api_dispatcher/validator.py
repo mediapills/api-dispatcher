@@ -73,10 +73,7 @@ class Validator(object):
             self.schema = validator.schema
             return True
 
-        if not filename:
-            return True
-
-        return False
+        return not filename
 
     def validate_spec(self):
         """Validates specification against corresponding schema
